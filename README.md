@@ -7,8 +7,8 @@ Workshop on the Cosmos SDK @ Gateway to Cosmos 2023
 ### Installation
 
 ```sh
-git clone git@github.com:julienrbrt/chain-minimal.git # pull this repository
-cd chain-minimal
+git clone git@github.com:julienrbrt/workshop-cosmos-sdkl.git # pull this repository
+cd workshop-cosmos-sdk
 make install # install the minid binary
 make init # initialize the chain
 ```
