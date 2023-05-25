@@ -35,6 +35,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/mint"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
+
+	"github.com/julienrbrt/chain-minimal/mempool"
 )
 
 var (
@@ -119,6 +121,16 @@ func NewMiniApp(
 	); err != nil {
 		panic(err)
 	}
+
+	// Below we could construct and set an application specific mempool and
+	// ABCI 1.0 PrepareProposal and ProcessProposal handlers. These defaults are
+	// already set in the SDK's BaseApp, this overwrite them.
+	nonceMempool := mempool.NewSenderNonceMempool()
+	prepareOpt := func(app *baseapp.BaseApp) {
+		abciPropHandler := baseapp.NewDefaultProposalHandler(nonceMempool, app)
+		app.SetPrepareProposal(abciPropHandler.PrepareProposalHandler())
+	}
+	baseAppOptions = append(baseAppOptions, prepareOpt)
 
 	app.App = appBuilder.Build(logger, db, traceStore, baseAppOptions...)
 
