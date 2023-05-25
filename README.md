@@ -7,7 +7,7 @@ Workshop on the Cosmos SDK @ Gateway to Cosmos 2023
 ### Installation
 
 ```sh
-git clone git@github.com:julienrbrt/workshop-cosmos-sdkl.git # pull this repository
+git clone git@github.com:julienrbrt/workshop-cosmos-sdk.git # pull this repository
 cd workshop-cosmos-sdk
 make install # install the minid binary
 make init # initialize the chain
