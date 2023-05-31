@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -21,6 +22,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/store/streaming"
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	"github.com/cosmos/cosmos-sdk/testutil/testdata"
+	sdkmempool "github.com/cosmos/cosmos-sdk/types/mempool"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
@@ -125,9 +127,17 @@ func NewMiniApp(
 	// Below we could construct and set an application specific mempool and
 	// ABCI 1.0 PrepareProposal and ProcessProposal handlers. These defaults are
 	// already set in the SDK's BaseApp, this overwrite them.
-	nonceMempool := mempool.NewSenderNonceMempool()
+	var selectedMempool sdkmempool.Mempool = sdkmempool.NoOpMempool{}
+	switch appOpts.Get(mempool.FlagMempoolType) {
+	case "fee":
+		selectedMempool = mempool.NewFeeMempool()
+	case "sender-nonce":
+		selectedMempool = mempool.NewSenderNonceMempool()
+	}
+	logger.Info("selected mempool", "type", fmt.Sprintf("%T", selectedMempool))
+
 	prepareOpt := func(app *baseapp.BaseApp) {
-		abciPropHandler := baseapp.NewDefaultProposalHandler(nonceMempool, app)
+		abciPropHandler := baseapp.NewDefaultProposalHandler(selectedMempool, app)
 		app.SetPrepareProposal(abciPropHandler.PrepareProposalHandler())
 	}
 	baseAppOptions = append(baseAppOptions, prepareOpt)
@@ -165,21 +175,6 @@ func (app *MiniApp) Name() string { return app.BaseApp.Name() }
 // LegacyAmino returns MiniApp's amino codec.
 func (app *MiniApp) LegacyAmino() *codec.LegacyAmino {
 	return app.legacyAmino
-}
-
-// AppCodec returns MiniApp's app codec.
-func (app *MiniApp) AppCodec() codec.Codec {
-	return app.appCodec
-}
-
-// TxConfig returns MiniApp's TxConfig
-func (app *MiniApp) TxConfig() client.TxConfig {
-	return app.txConfig
-}
-
-// InterfaceRegistry returns MiniApp's InterfaceRegistry
-func (app *MiniApp) InterfaceRegistry() codectypes.InterfaceRegistry {
-	return app.interfaceRegistry
 }
 
 // GetKey returns the KVStoreKey for the provided store key.

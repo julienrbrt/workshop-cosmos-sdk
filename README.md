@@ -13,6 +13,10 @@ make install # install the minid binary
 make init # initialize the chain
 ```
 
+### Workshop
+
+Follow along the workshop in [WORKSHOP.md](./WORKSHOP.md).
+
 ## Useful links
 
 - [Cosmos-SDK Documentation](https://docs.cosmos.network/v0.47/building-apps/app-mempool)
