@@ -14,6 +14,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth/signing"
 )
 
+// THIS IS COPIED FROM THE COSMOS-SDK REPO AS IS FOR REDABILITY IN THE WORKSHOP
+// source: https://github.com/cosmos/cosmos-sdk/blob/release/v0.47.x/types/mempool/sender_nonce.go
+
 var (
 	_ mempool.Mempool  = (*SenderNonceMempool)(nil)
 	_ mempool.Iterator = (*senderNonceMempoolIterator)(nil)
