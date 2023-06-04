@@ -38,12 +38,12 @@ type SenderNonceMempool struct {
 	senders    map[string]*skiplist.SkipList
 	rnd        *rand.Rand
 	maxTx      int
-	existingTx map[txKey]bool
+	existingTx map[snmTxKey]bool
 }
 
 type SenderNonceOptions func(*SenderNonceMempool)
 
-type txKey struct {
+type snmTxKey struct {
 	address string
 	nonce   uint64
 }
@@ -52,7 +52,7 @@ type txKey struct {
 // nonce, the lowest first, picking a random sender on each iteration.
 func NewSenderNonceMempool(opts ...SenderNonceOptions) *SenderNonceMempool {
 	senderMap := make(map[string]*skiplist.SkipList)
-	existingTx := make(map[txKey]bool)
+	existingTx := make(map[snmTxKey]bool)
 	snp := &SenderNonceMempool{
 		senders:    senderMap,
 		maxTx:      DefaultMaxTx,
@@ -147,7 +147,7 @@ func (snm *SenderNonceMempool) Insert(_ context.Context, tx sdk.Tx) error {
 
 	senderTxs.Set(nonce, tx)
 
-	key := txKey{nonce: nonce, address: sender}
+	key := snmTxKey{nonce: nonce, address: sender}
 	snm.existingTx[key] = true
 
 	return nil
@@ -220,7 +220,7 @@ func (snm *SenderNonceMempool) Remove(tx sdk.Tx) error {
 		delete(snm.senders, sender)
 	}
 
-	key := txKey{nonce: nonce, address: sender}
+	key := snmTxKey{nonce: nonce, address: sender}
 	delete(snm.existingTx, key)
 
 	return nil

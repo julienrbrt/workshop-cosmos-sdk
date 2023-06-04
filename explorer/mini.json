@@ -1,0 +1,22 @@
+{
+    "chain_name": "mini",
+    "coingecko": "",
+    "api": [
+        "http://127.0.0.1:1317"
+    ],
+    "rpc": [
+        "http://127.0.0.1:26657"
+    ],
+    "snapshot_provider": "",
+    "coin_type": "118",
+    "sdk_version": "0.47.3",
+    "addr_prefix": "mini",
+    "assets": [
+        {
+            "base": "mini",
+            "symbol": "MINI",
+            "exponent": "6",
+            "coingecko_id": ""
+        }
+    ]
+}

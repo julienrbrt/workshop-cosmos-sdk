@@ -102,8 +102,8 @@ func NewRootCmd() *cobra.Command {
 func initCometBFTConfig() *cmtcfg.Config {
 	cfg := cmtcfg.DefaultConfig()
 
-	// set 20 seconds blocks
-	cfg.Consensus.TimeoutCommit = 20 * time.Second
+	// set 10 seconds blocks
+	cfg.Consensus.TimeoutCommit = 10 * time.Second
 
 	// use cometbft fifo mempool
 	cfg.Mempool.Version = cmtcfg.MempoolV0

@@ -124,23 +124,29 @@ func NewMiniApp(
 		panic(err)
 	}
 
-	// Below we could construct and set an application specific mempool and
-	// ABCI 1.0 PrepareProposal and ProcessProposal handlers. These defaults are
-	// already set in the SDK's BaseApp, this overwrite them.
+	// Below we construct and set an application specific mempool.
+	// We use the default prepare and process proposal handlers
+	// that are already set in the SDK's BaseApp.
 	var selectedMempool sdkmempool.Mempool = sdkmempool.NoOpMempool{}
 	switch appOpts.Get(mempool.FlagMempoolType) {
-	case "fee":
-		selectedMempool = mempool.NewFeeMempool()
+	case "none":
+		selectedMempool = sdkmempool.NoOpMempool{}
 	case "sender-nonce":
-		selectedMempool = mempool.NewSenderNonceMempool()
+		selectedMempool = sdkmempool.NewSenderNonceMempool()
+	case "priority-nonce":
+		selectedMempool = sdkmempool.DefaultPriorityMempool()
+	case "fee":
+		selectedMempool = mempool.NewFeeMempool(0)
+	default:
+		panic(fmt.Errorf("mempool not supported, got: %s, want none|fee|sender-nonce", appOpts.Get(mempool.FlagMempoolType)))
 	}
 	logger.Info("selected mempool", "type", fmt.Sprintf("%T", selectedMempool))
 
-	prepareOpt := func(app *baseapp.BaseApp) {
-		abciPropHandler := baseapp.NewDefaultProposalHandler(selectedMempool, app)
-		app.SetPrepareProposal(abciPropHandler.PrepareProposalHandler())
+	mempoolOpt := func(app *baseapp.BaseApp) {
+		app.SetMempool(selectedMempool)
 	}
-	baseAppOptions = append(baseAppOptions, prepareOpt)
+
+	baseAppOptions = append(baseAppOptions, mempoolOpt)
 
 	app.App = appBuilder.Build(logger, db, traceStore, baseAppOptions...)
 
