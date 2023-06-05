@@ -1,41 +1,70 @@
-## Creating a Fee Mempool
+# Workshop
 
-### Step 1: Import Necessary Packages
+## Introduction
 
-At the top of the file, you will need to import necessary packages:
+Cosmos SDK v0.47 implements ABCI++ with [Prepare and Process proposal](https://docs.cometbft.com/v0.37/spec/abci/abci++_basic_concepts.html).
+These ABCI methods allows the developer to completely take control of the block creation.
+This means developers can easily decide what tx are prioritized, what a block should contains and verify transactions before them being included in a block.
+Cosmos SDK Twilight facilate that by providing a `mempool.Mempool` interface package that allows developers to create their own mempool.
 
-```go
-package mempool
+In this workshop, we will create a mempool that prioritizes transactions with the highest fee.
+We will use the default Process and Prepare proposal handlers of the Cosmos SDK, where when a mempool is used, only valid transactions are included in a block.
+Note, that the SDK provides by default 3 mempools: Sender Nonce, Sender Nonce Priority and No-Op.
 
-import (
-	"context"
-	"fmt"
-	"math"
-	"sort"
+* The No-Op mempool keeps the same behavior as the previous SDK versions, and process transactions in the order they are in CometBFT mempool.
+* Sender Nonce is a mempool that prioritizes transactions within a sender by nonce, the lowest first, but selects a random sender on each iteration.
+* Sender Nonce Priority (Fee)  is a mempool implementation that stores txs in a partially ordered set by 2 dimensions: priority, and sender-nonce (sequence number).
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/mempool"
-	"github.com/cosmos/cosmos-sdk/x/auth/signing"
-)
+The default mempool of the SDK is the No-Op mempool, to keep behavior of the previous SDK versions.
 
-```
+## How to set a mempool in a Cosmos SDK chain
 
-### Step 2: Define FeeMempool
-
-Next, we'll define our `FeeMempool` struct.
+A mempool implementing the `mempool.Mempool` interface, can simply be added to a Cosmos SDK chain by using the baseapp `SetMempool` method in the `app.go` file.
 
 ```go
-type FeeMempool struct {
-	txs   fmTxs
-	maxTx int
+mempoolOpt := func(app *baseapp.BaseApp) {
+	app.SetMempool(selectedMempool)
 }
 ```
 
-This struct will contain a slice of `fmTx` (which we will define soon) and `maxTx`, the maximum number of transactions allowed in the mempool.
+## Creating a Fee Mempool
 
-### Step 3: Check Interface Implementation
+As mentionned earlier, to create a mempool, we need to implement the `mempool.Mempool` interface.
 
-Before moving forward, let's ensure that our `FeeMempool` struct correctly implements the `mempool.Mempool` interface. We do this with the following line:
+The interface is defined as follow:
+
+```go
+type Mempool interface {
+	// Insert attempts to insert a Tx into the app-side mempool returning
+	// an error upon failure.
+	Insert(context.Context, sdk.Tx) error
+
+	// Select returns an Iterator over the app-side mempool. If txs are specified,
+	// then they shall be incorporated into the Iterator. The Iterator must
+	// closed by the caller.
+	Select(context.Context, [][]byte) Iterator
+
+	// CountTx returns the number of transactions currently in the mempool.
+	CountTx() int
+
+	// Remove attempts to remove a transaction from the mempool, returning an error
+	// upon failure.
+	Remove(sdk.Tx) error
+}
+```
+
+### Step 1: Define FeeMempool
+
+Next, we define a `FeeMempool` struct that will store the transactions.
+
+```go
+type FeeMempool struct {
+	logger log.Logger
+	pool   fmTxs
+}
+```
+
+Before moving forward, let's ensure that our `FeeMempool` struct correctly implements the `mempool.Mempool` interface.
 
 ```go
 var _ mempool.Mempool = (*FeeMempool)(nil)
@@ -43,199 +72,43 @@ var _ mempool.Mempool = (*FeeMempool)(nil)
 
 If `FeeMempool` does not satisfy the `mempool.Mempool` interface, the Go compiler will throw an error.
 
-### Step 4: Define
 
-Now we will define `fmTx` struct and `fmTxs` type:
+### Step 2: Implement interface methods
 
-```go
-type fmTx struct {
-	address  string
-	priority int64
-	tx       sdk.Tx
-}
+Implement on the `FeeMempool` struct the different mempool methods.
 
-var _ mempool.Iterator = fmTxs{}
+See [fee.go](./mempool/fee.go) for example.
 
-type fmTxs []fmTx
-```
+### Step 3: Testing
 
-We also need to define methods for the `fmTxs` type to satisfy the `mempool.Iterator` interface:
+For this workshop we have provided a few helpers to easily run an application and test it.
 
-```go
-var _ mempool.Iterator = fmTxs{}
-
-func (fm fmTxs) Next() mempool.Iterator {
-	if len(fm) == 0 {
-		return nil
-	}
-	return fm[1 : len(fm)-1]
-}
-
-func (fm fmTxs) Tx() sdk.Tx {
-	if len(fm) == 0 {
-		return nil
-	}
-	return fm[0].tx
-}
-
-```
-
-Again, we do a compile-time check to ensure that `fmTxs` satisfies the `mempool.Iterator` interface.
-
-### Step 5: Define FeeMempool Methods
-
-Now we need to define methods for the `FeeMempool` type. These methods implement the `mempool.Mempool` interface, including `Insert`, `Select`, `CountTx` and `Remove`.
-
-```go
-// Insert a transaction in the mempool per sender
-func (fm *FeeMempool) Insert(_ context.Context, tx sdk.Tx) error {
-	// check the mempool capacity if a maximum amount of transaction is set
-	if fm.maxTx > 0 && fm.CountTx() >= fm.maxTx {
-		return mempool.ErrMempoolTxMaxCapacity
-	}
-	if fm.maxTx < 0 {
-		return nil
-	}
-
-	sigs, err := tx.(signing.SigVerifiableTx).GetSignaturesV2()
-	if err != nil {
-		return err
-	}
-	if len(sigs) == 0 {
-		return fmt.Errorf("tx must have at least one signer")
-	}
-
-	sig := sigs[0]
-	sender := sdk.AccAddress(sig.PubKey.Address()).String()
-
-	// by default a transaction has no priority
-	var priority int64
-	if feeTx, ok := tx.(sdk.FeeTx); ok {
-		priority = naiveGetTxPriority(feeTx.GetFee(), int64(feeTx.GetGas()))
-	}
-
-	fm.txs = append(fm.txs, fmTx{
-		priority: priority,
-		address:  sender,
-		tx:       tx,
-	})
-
-	return nil
-}
-
-// Select returns an iterator ordering transactions the mempool with the highest fee.
-// NOTE: It is not safe to use this iterator while removing transactions from the underlying mempool.
-func (fm *FeeMempool) Select(_ context.Context, _ [][]byte) mempool.Iterator {
-	// sort all txs after each insertion (truly not efficient, but you get it)
-	sort.Slice(fm.txs, func(i, j int) bool {
-		return fm.txs[i].priority > fm.txs[j].priority
-	})
-
-	return fm.txs
-}
-
-// CounTx counts the amount of txs in the mempool
-func (fm *FeeMempool) CountTx() int {
-	return len(fm.txs)
-}
-
-// Remove removes a tx from the mempool. It returns an error if the tx does not have at least one signer or the tx was not found in the pool.
-func (fm *FeeMempool) Remove(tx sdk.Tx) error {
-	sigs, err := tx.(signing.SigVerifiableTx).GetSignaturesV2()
-	if err != nil {
-		return err
-	}
-	if len(sigs) == 0 {
-		return fmt.Errorf("tx must have at least one signer")
-	}
-
-	sig := sigs[0]
-	sender := sdk.AccAddress(sig.PubKey.Address()).String()
-	var priority int64
-	if feeTx, ok := tx.(sdk.FeeTx); ok {
-		priority = naiveGetTxPriority(feeTx.GetFee(), int64(feeTx.GetGas())) // we will complete naiveGetTxPriority in the next steps
-	}
-
-	txToDelete := fmTx{priority: priority, address: sender}
-	for idx, fmTx := range fm.txs {
-		if fmTx == txToDelete {
-			fm.txs = removeAtIndex(fm.txs, idx)
-			return nil
-		}
-	}
-
-	return fmt.Errorf("failed to remove transaction from the mempool")
-}
-```
-
-### Step 6: Implement NewFeeMempool Constructor
-
-Finally, implement the constructor function `NewFeeMempool` which returns an instance of `FeeMempool`:
-
-```go
-func NewFeeMempool(logger log.Logger) *FeeMempool {
-    return &FeeMempool{logger: logger.With("module", "fee-mempool")}
-}
-
-```
-
-### Step 7: Define Helper Functions
-
-Now we define `naiveGetTxPriority`, a helper function that is used to determine the priority of a transaction:
-
-```go
-func naiveGetTxPriority(fee sdk.Coins, gas int64) int64 {
-	var priority int64
-	for _, c := range fee {
-		p := int64(math.MaxInt64)
-		gasPrice := c.Amount.QuoRaw(gas)
-		if gasPrice.IsInt64() {
-			p = gasPrice.Int64()
-		}
-		if priority == 0 || p < priority {
-			priority = p
-		}
-	}
-
-	return priority
-}
-
-```
-This function takes the fee and gas of a transaction as inputs. It calculates the priority of a transaction by finding the smallest gas price (fee/gas) among all denominations in the fee. The calculated priority is then used when inserting the transaction into the mempool.
-
-### Step 8: Use Helper Function in Mempool Methods
-
-Now that you have the `naiveGetTxPriority` function, you can use it in the `Insert` method of `FeeMempool` to assign a priority to each transaction based on its fee and gas. This priority is then used to sort the transactions in the mempool.
-
-With this, your `FeeMempool` is complete. The `naiveGetTxPriority` function is an important part of the `FeeMempool` as it allows transactions to be sorted and prioritized based on their fees.
-
-
-### Step 9: Testing
-
-Executing the genesis setup
+Execute the genesis setup (creates 3 accounts, and gives them some tokens and a validator):
 
 ```bash
+make install
 make init
 ```
 
-Starting the app and using the mempool type `sender nonce`
+The application requires a `--mempool-type` flag to be set, so we can test the different mempools.
+Normally, this flag isn't required in an actual application.
+
+Start the node with the following command:
 
 ```bash
-make install && minid start --mempool-type sender-nonce
+minid start --mempool-type [mempool-type]
 ```
 
-Run send transaction script which will give us the mempool order.
+You can use the SDK mempools (`none` (i.e NoOp), `sender-nonce` or `priority-nonce`).
+Additionally you can use the fee mempool we have created here with `fee` or use you own (not you'll need to add it to the `app.go` file)
+
+Finally, run some tests transactions and see how the mempool orders them.
 
 ```bash
 ./scripts/send_txs.sh
 ```
 
-When using `--mempool-type none` when running the above script, it should return 
-`CAROL - ALICE - BOB`
+When using `--mempool-type none` when running the above script, it should return `CAROL - ALICE - BOB`.
+However, with the fee mempool `--mempool-type fee` the transactions are ordered by fees, so in the block it will be ordered as: `BOB - ALICE - CAROL`.
 
-However, with the fee mempool `--mempool-type fee` the transactions or ordered by fees, so in the block it will be ordered as: `BOB - ALICE - CAROL`
-
-And lastly with `--mempool-type sender-nonce` the transactions or ordered by the lowest nonce, so in the block it will be ordered as:
-`CAROL - BOB - ALICE`
-
-
+The other mempool are ordered randomly (but determinastically thanks to the seed). Try it out to see what you get.

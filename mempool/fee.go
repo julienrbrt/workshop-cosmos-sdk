@@ -95,6 +95,10 @@ func (fm *FeeMempool) Insert(_ context.Context, tx sdk.Tx) error {
 	sender := sdk.AccAddress(sig.PubKey.Address()).String()
 
 	// by default a transaction has no priority
+	// note, we could have got the prority from the context as well
+	// however, we wanted to demonstrate that any custom logic can be used to determine the priority of a transaction
+	// sdkContext := sdk.UnwrapSDKContext(ctx)
+	// priority := sdkContext.Priority()
 	var priority int64
 	if feeTx, ok := tx.(sdk.FeeTx); ok {
 		priority = naiveGetTxPriority(feeTx.GetFee())

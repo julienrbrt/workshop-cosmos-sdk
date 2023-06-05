@@ -138,7 +138,7 @@ func NewMiniApp(
 	case "fee":
 		selectedMempool = mempool.NewFeeMempool(logger)
 	default:
-		panic(fmt.Errorf("mempool not supported, got: %s, want none|fee|sender-nonce", appOpts.Get(mempool.FlagMempoolType)))
+		panic(fmt.Errorf("mempool not supported, got: %s, want none|sender-nonce|priority-nonce|fee", appOpts.Get(mempool.FlagMempoolType)))
 	}
 	logger.Info("selected mempool", "type", fmt.Sprintf("%T", selectedMempool))
 
