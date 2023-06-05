@@ -2,20 +2,19 @@
 
 ## Introduction
 
-Cosmos SDK v0.47 implements ABCI++ with [Prepare and Process proposal](https://docs.cometbft.com/v0.37/spec/abci/abci++_basic_concepts.html).
-These ABCI methods allows the developer to completely take control of the block creation.
-This means developers can easily decide what tx are prioritized, what a block should contains and verify transactions before them being included in a block.
-Cosmos SDK Twilight facilate that by providing a `mempool.Mempool` interface package that allows developers to create their own mempool.
+Cosmos SDK v0.47 implements ABCI++ with [Prepare and Process Proposal](https://docs.cometbft.com/v0.37/spec/abci/abci++_basic_concepts.html).
+These ABCI methods allow the developer to completely take control of the block creation.
+This means developers can easily decide what tx are prioritized, what a block should contain and verify transactions before them being included in a block. Cosmos SDK Twilight facilitates that by providing a `mempool.Mempool` interface package that allows developers to create their own mempool.
 
 In this workshop, we will create a mempool that prioritizes transactions with the highest fee.
-We will use the default Process and Prepare proposal handlers of the Cosmos SDK, where when a mempool is used, only valid transactions are included in a block.
+We will use the default Process and Prepare Proposal handlers of the Cosmos SDK, where when a mempool is used, only valid transactions are included in a block.
 Note, that the SDK provides by default 3 mempools: Sender Nonce, Sender Nonce Priority and No-Op.
 
-* The No-Op mempool keeps the same behavior as the previous SDK versions, and process transactions in the order they are in CometBFT mempool.
+* The No-Op mempool keeps the same behavior as the previous SDK versions, and processes transactions in the order they are in CometBFT mempool.
 * Sender Nonce is a mempool that prioritizes transactions within a sender by nonce, the lowest first, but selects a random sender on each iteration.
-* Sender Nonce Priority (Fee)  is a mempool implementation that stores txs in a partially ordered set by 2 dimensions: priority, and sender-nonce (sequence number).
+* Sender Nonce Priority (Fee) is a mempool implementation that stores txs in a partially ordered set by 2 dimensions: priority, and sender-nonce (sequence number).
 
-The default mempool of the SDK is the No-Op mempool, to keep behavior of the previous SDK versions.
+The default mempool of the SDK is the No-Op mempool, to keep the behavior of the previous SDK versions.
 
 ## How to set a mempool in a Cosmos SDK chain
 
