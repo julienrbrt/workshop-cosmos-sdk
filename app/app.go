@@ -136,7 +136,7 @@ func NewMiniApp(
 	case "priority-nonce":
 		selectedMempool = sdkmempool.DefaultPriorityMempool()
 	case "fee":
-		selectedMempool = mempool.NewFeeMempool(0)
+		selectedMempool = mempool.NewFeeMempool(logger)
 	default:
 		panic(fmt.Errorf("mempool not supported, got: %s, want none|fee|sender-nonce", appOpts.Get(mempool.FlagMempoolType)))
 	}
