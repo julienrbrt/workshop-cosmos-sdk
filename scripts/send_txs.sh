@@ -30,7 +30,7 @@ stringify_name () {
 # Normally mempool were FIFO, so it the block should have been by time of transaction receipt
 # In this case CAROL - ALICE - BOB (try this with `minid start --mempool-type none`)
 # However, with the fee mempool, the transactions or ordered by fees, so in the block it will be ordered as
-# BOB - ALICE - CAROL (try this with `minid start --mempool-type fee``)
+# BOB - ALICE - CAROL (try this with `minid start --mempool-type fee`)
 echo "--> sending transactions in the order carol, alice, bob"
 minid tx bank send carol $alice 10mini -y --output json > /dev/null
 tx=$(minid tx bank send alice $bob 10mini --fees 10mini -y --output json | jq -r .txhash)

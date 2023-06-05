@@ -5,7 +5,6 @@ import (
 
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/mempool"
 	txsigning "github.com/cosmos/cosmos-sdk/types/tx/signing"
 	"github.com/cosmos/cosmos-sdk/x/auth/signing"
 )
@@ -52,14 +51,28 @@ func (tx testTx) GetSigners() []sdk.AccAddress { panic("not implemented") }
 
 func (tx testTx) GetPubKeys() ([]cryptotypes.PubKey, error) { panic("not implemented") }
 
-func (tx testTx) GetSignaturesV2() (res []txsigning.SignatureV2, err error) {
-	res = append(res, txsigning.SignatureV2{
+func (tx testTx) GetSignaturesV2() ([]txsigning.SignatureV2, error) {
+	return []txsigning.SignatureV2{{
 		PubKey:   testPubKey{address: tx.address},
 		Data:     nil,
 		Sequence: tx.nonce,
-	})
+	}}, nil
+}
 
-	return res, nil
+func (tx testTx) GetGas() uint64 {
+	return 10
+}
+
+func (tx testTx) GetFee() sdk.Coins {
+	return sdk.NewCoins(sdk.NewCoin("mini", sdk.NewInt(tx.priority)))
+}
+
+func (tx testTx) FeePayer() sdk.AccAddress {
+	return tx.address
+}
+
+func (tx testTx) FeeGranter() sdk.AccAddress {
+	return tx.address
 }
 
 var (
@@ -74,14 +87,4 @@ func (tx testTx) ValidateBasic() error { return nil }
 
 func (tx testTx) String() string {
 	return fmt.Sprintf("tx a: %s, p: %d, n: %d", tx.address, tx.priority, tx.nonce)
-}
-
-func fetchTxs(iterator mempool.Iterator) []sdk.Tx {
-	var txs []sdk.Tx
-	for iterator != nil {
-		txs = append(txs, iterator.Tx())
-		i := iterator.Next()
-		iterator = i
-	}
-	return txs
 }

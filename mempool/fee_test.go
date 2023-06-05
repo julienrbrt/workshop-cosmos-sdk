@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/cometbft/cometbft/libs/log"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/stretchr/testify/require"
 
@@ -26,18 +27,18 @@ func TestTxOrder(t *testing.T) {
 	}{
 		{
 			txs: []txSpec{
-				{sender: sa, priority: 1},
-				{sender: sb, priority: 2},
-				{sender: sc, priority: 3},
-				{sender: sa, priority: 4},
+				{sender: sa, priority: 0},
+				{sender: sb, priority: 20},
+				{sender: sc, priority: 30},
+				{sender: sd, priority: 50},
 			},
 			order: []int{3, 2, 1, 0},
 		},
 		{
 			txs: []txSpec{
 				{sender: sa, priority: 30},
-				{sender: sb, priority: 2},
-				{sender: sa, priority: 15},
+				{sender: sb, priority: 10},
+				{sender: sa, priority: 20},
 				{sender: sd, priority: 0},
 			},
 			order: []int{0, 2, 1, 3},
@@ -45,16 +46,21 @@ func TestTxOrder(t *testing.T) {
 	}
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
-			pool := mempool.NewFeeMempool(log.NewNopLogger())
+			pool := mempool.NewFeeMempool(log.TestingLogger())
 			// create test txs and insert into mempool
 			for i, ts := range tt.txs {
 				tx := testTx{id: i, priority: int64(ts.priority), address: ts.sender, nonce: uint64(i)}
 				err := pool.Insert(context.Background(), tx)
 				require.NoError(t, err)
+				require.Equal(t, i+1, pool.CountTx())
 			}
 
+			var orderedTxs []sdk.Tx
 			itr := pool.Select(context.Background(), nil)
-			orderedTxs := fetchTxs(itr)
+			for itr != nil {
+				orderedTxs = append(orderedTxs, itr.Tx())
+				itr = itr.Next()
+			}
 
 			var txOrder []int
 			for _, tx := range orderedTxs {

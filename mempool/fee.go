@@ -22,6 +22,7 @@ func NewFeeMempool(logger log.Logger) *FeeMempool {
 // FeeMempool defines a mempool that prioritizes transactions according to their fees.
 // Transactions with higher fees are placed at the front of the queue.
 // Once no more transactions has fees, the remainaing transactions are inserted until the mempool is full.
+// This mempool is not optimized, do not use in production.
 type FeeMempool struct {
 	logger log.Logger
 	pool   fmTxs
@@ -33,27 +34,51 @@ type fmTx struct {
 	tx       sdk.Tx
 }
 
+func (fm fmTx) Equal(other fmTx) bool {
+	if fm.address != other.address || fm.priority != other.priority {
+		return false
+	}
+
+	if len(fm.tx.GetMsgs()) != len(other.tx.GetMsgs()) {
+		return false
+	}
+
+	for i, msg := range fm.tx.GetMsgs() {
+		if msg.String() != other.tx.GetMsgs()[i].String() { // bad comparison but this is just for demonstration purpose
+			return false
+		}
+	}
+
+	return true
+}
+
 var _ mempool.Iterator = &fmTxs{}
 
 type fmTxs struct {
-	lastTx bool
-	txs    []fmTx
+	idx int
+	txs []fmTx
 }
 
 // Next returns an interator with one less tx in the pool
 func (fm *fmTxs) Next() mempool.Iterator {
-	if len(fm.txs) == 0 || fm.lastTx {
+	if len(fm.txs) == 0 {
 		return nil
-	} else if len(fm.txs) == 1 {
-		return &fmTxs{txs: fm.txs, lastTx: true}
 	}
 
-	fm.txs = removeAtIndex(fm.txs, 0)
+	if len(fm.txs) == fm.idx+1 {
+		return nil
+	}
+
+	fm.idx++
 	return fm
 }
 
 func (fm *fmTxs) Tx() sdk.Tx {
-	return fm.txs[0].tx
+	if fm.idx >= len(fm.txs) {
+		panic(fmt.Sprintf("index out of bound: %d, fmTxs: %v", fm.idx, fm))
+	}
+
+	return fm.txs[fm.idx].tx
 }
 
 // Insert a transaction in the mempool per sender
@@ -88,15 +113,19 @@ func (fm *FeeMempool) Insert(_ context.Context, tx sdk.Tx) error {
 // Select returns an iterator ordering transactions the mempool with the highest fee.
 // NOTE: It is not safe to use this iterator while removing transactions from the underlying mempool.
 func (fm *FeeMempool) Select(_ context.Context, _ [][]byte) mempool.Iterator {
+	if len(fm.pool.txs) == 0 {
+		return nil
+	}
+
 	// sort all txs after each insertion (truly not efficient, but you get it)
 	sort.Slice(fm.pool.txs, func(i, j int) bool {
-		return fm.pool.txs[i].priority < fm.pool.txs[j].priority
+		return fm.pool.txs[j].priority < fm.pool.txs[i].priority
 	})
 
 	return &fm.pool
 }
 
-// CounTx counts the amount of txs in the mempool
+// CountTx returns the total amount of transactions in the mempool
 func (fm *FeeMempool) CountTx() int {
 	return len(fm.pool.txs)
 }
@@ -120,13 +149,13 @@ func (fm *FeeMempool) Remove(tx sdk.Tx) error {
 
 	txToDelete := fmTx{priority: priority, address: sender, tx: tx}
 	for idx, fmTx := range fm.pool.txs {
-		if fmTx == txToDelete {
+		if fmTx.Equal(txToDelete) {
 			fm.pool.txs = removeAtIndex(fm.pool.txs, idx)
 			return nil
 		}
 	}
 
-	return fmt.Errorf("failed to remove transaction from the mempool")
+	return mempool.ErrTxNotFound
 }
 
 // took from https://github.com/cosmos/cosmos-sdk/blob/9f9833e518df0c3ce3816a3eb369666dedacf4c3/x/auth/ante/validator_tx_fee.go#L50 for demonstration purpose
