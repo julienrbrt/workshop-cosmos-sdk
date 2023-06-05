@@ -97,10 +97,10 @@ func (fm *FeeMempool) Insert(_ context.Context, tx sdk.Tx) error {
 	// by default a transaction has no priority
 	var priority int64
 	if feeTx, ok := tx.(sdk.FeeTx); ok {
-		priority = naiveGetTxPriority(feeTx.GetFee(), int64(feeTx.GetGas()))
+		priority = naiveGetTxPriority(feeTx.GetFee())
 	}
 
-	fm.logger.Info(fmt.Sprintf("transaction from %s inserted in mempool", sender))
+	fm.logger.Info(fmt.Sprintf("transaction from %s inserted in mempool with priority %d", sender, priority))
 	fm.pool.txs = append(fm.pool.txs, fmTx{
 		address:  sender,
 		priority: priority,
@@ -144,7 +144,7 @@ func (fm *FeeMempool) Remove(tx sdk.Tx) error {
 	sender := sdk.AccAddress(sig.PubKey.Address()).String()
 	var priority int64
 	if feeTx, ok := tx.(sdk.FeeTx); ok {
-		priority = naiveGetTxPriority(feeTx.GetFee(), int64(feeTx.GetGas()))
+		priority = naiveGetTxPriority(feeTx.GetFee())
 	}
 
 	txToDelete := fmTx{priority: priority, address: sender, tx: tx}
@@ -158,18 +158,14 @@ func (fm *FeeMempool) Remove(tx sdk.Tx) error {
 	return mempool.ErrTxNotFound
 }
 
-// took from https://github.com/cosmos/cosmos-sdk/blob/9f9833e518df0c3ce3816a3eb369666dedacf4c3/x/auth/ante/validator_tx_fee.go#L50 for demonstration purpose
-// naiveGetTxPriority returns a naive tx priority based on the amount of the smallest denomination of the gas price
+// naiveGetTxPriority returns a naive tx priority based on the amount of the smallest denomination of the fee
 // provided in a transaction.
-// NOTE: This implementation should be used with a great consideration as it opens potential attack vectors
-// where txs with multiple coins could not be prioritize as expected.
-func naiveGetTxPriority(fee sdk.Coins, gas int64) int64 {
+func naiveGetTxPriority(fee sdk.Coins) int64 {
 	var priority int64
 	for _, c := range fee {
 		p := int64(math.MaxInt64)
-		gasPrice := c.Amount.QuoRaw(gas)
-		if gasPrice.IsInt64() {
-			p = gasPrice.Int64()
+		if c.Amount.IsInt64() {
+			p = c.Amount.Int64()
 		}
 		if priority == 0 || p < priority {
 			priority = p
