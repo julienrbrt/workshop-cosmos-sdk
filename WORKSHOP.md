@@ -173,10 +173,8 @@ func (fm *FeeMempool) Remove(tx sdk.Tx) error {
 Finally, implement the constructor function `NewFeeMempool` which returns an instance of `FeeMempool`:
 
 ```go
-func NewFeeMempool(maxTx int) *FeeMempool {
-	return &FeeMempool{
-        maxTx: maxTx,
-    }
+func NewFeeMempool(logger log.Logger) *FeeMempool {
+    return &FeeMempool{logger: logger.With("module", "fee-mempool")}
 }
 
 ```
