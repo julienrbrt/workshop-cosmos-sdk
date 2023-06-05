@@ -24,7 +24,7 @@ stringify_name () {
     esac
 }
 
-# Normally mempool were FIFO, so it the block should have been by time of transaction receival
+# Normally mempool were FIFO, so it the block should have been by time of transaction receipt
 # In this case CAROL - ALICE - BOB (try this with `minid start --mempool-type none`)
 # However, with the fee mempool, the transactions or ordered by fees, so in the block it will be ordered as
 # BOB - ALICE - CAROL (try this with `minid start --mempool-type fee``)
@@ -33,7 +33,7 @@ tx=$(minid tx bank send alice $bob 10mini --fees 10mini -y --output json | jq -r
 minid tx bank send bob $carol 10mini --fees 100mini -y --output json > /dev/null
 
 echo "--> sleeping the block time timeout duration"
-sleep 15s
+sleep 15
 
 # query which block those txs have been included into
 height=$(minid q tx $tx --type hash --output json | jq .height -r)
@@ -42,6 +42,7 @@ height=$(minid q tx $tx --type hash --output json | jq .height -r)
 txs=$(minid q block $height | jq .block.data.txs -r | jq -c '.[]')
 
 echo "--> printing transaction order in block $height"
+
 for rawTx in $txs; do
     get_name $(minid tx decode $(echo $rawTx | jq -r) | jq -r .body.messages[0].from_address)
 done;
