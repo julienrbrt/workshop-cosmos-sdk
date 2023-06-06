@@ -20,7 +20,7 @@ require (
 	github.com/huandu/skiplist v1.2.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.16.0
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 )
 
 require (
