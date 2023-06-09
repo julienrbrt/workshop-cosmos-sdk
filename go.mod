@@ -16,7 +16,7 @@ require (
 	cosmossdk.io/depinject v1.0.0-alpha.3
 	github.com/cometbft/cometbft v0.37.1
 	github.com/cometbft/cometbft-db v0.8.0
-	github.com/cosmos/cosmos-sdk v0.47.3-0.20230601120457-2e70efc10af3
+	github.com/cosmos/cosmos-sdk v0.47.3
 	github.com/huandu/skiplist v1.2.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.16.0
